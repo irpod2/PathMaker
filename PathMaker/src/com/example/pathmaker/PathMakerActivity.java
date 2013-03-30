@@ -6,7 +6,6 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.res.Configuration;
-import android.graphics.Color;
 import android.graphics.Point;
 import android.os.Bundle;
 import android.view.Display;
@@ -30,16 +29,19 @@ public class PathMakerActivity extends Activity
 	{
 		super.onCreate(savedInstanceState);
 
+		// Fullscreen
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
 		getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
 				WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
-
+		// Set cameraWidth and cameraHeight
 		detectDisplaySize();
 
+		// Change background image from ic_launcher to desired image in
+		// drawables folder
 		pathView = new PathView(this, R.drawable.ic_launcher, cameraWidth,
 				cameraHeight);
-		pathView.setBackgroundColor(Color.BLACK);
+		
 		setContentView(pathView);
 	}
 
@@ -77,13 +79,15 @@ public class PathMakerActivity extends Activity
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item)
 	{
-
 		switch (item.getItemId())
 		{
+		// Clear all paths displayed
 		case R.id.clear:
 			pathView.clearPath();
 			break;
+		// Save all paths displayed
 		case R.id.save:
+			// Dialog to designate save file name
 			AlertDialog.Builder saveBuilder = new AlertDialog.Builder(this);
 			saveBuilder.setTitle("Save File (.map)");
 			final EditText saveInput = new EditText(this);
@@ -104,13 +108,16 @@ public class PathMakerActivity extends Activity
 							pathView.savePaths(recentFilename);
 						}
 					});
+
 			saveBuilder.setNegativeButton("Cancel", null);
 
 			saveBuilder.setCancelable(true);
 
 			saveBuilder.show();
 			break;
+		// Load file from storage
 		case R.id.load:
+			// Dialog to designate load file name
 			AlertDialog.Builder loadBuilder = new AlertDialog.Builder(this);
 			loadBuilder.setTitle("Load File");
 			final EditText loadInput = new EditText(this);
@@ -133,6 +140,7 @@ public class PathMakerActivity extends Activity
 							pathView.loadPaths(recentFilename);
 						}
 					});
+
 			loadBuilder.setNegativeButton("Cancel", null);
 
 			loadBuilder.setCancelable(true);
@@ -150,8 +158,10 @@ public class PathMakerActivity extends Activity
 	{
 		super.onConfigurationChanged(newConfig);
 
+		// Redetect cameraWidth and cameraHeight
 		detectDisplaySize();
 
+		// Resize paths
 		pathView.onOrientationChanged(cameraWidth, cameraHeight);
 	}
 }

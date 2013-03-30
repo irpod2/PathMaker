@@ -40,6 +40,8 @@ public class PathView extends ImageView
 		setImageResource(resourceID);
 	}
 
+	// thinPaint is used for lines
+	// thickPaint is used for points
 	private void setPaints()
 	{
 		thinPaint.setColor(Color.BLUE);
@@ -50,6 +52,7 @@ public class PathView extends ImageView
 		thickPaint.setStrokeWidth(16);
 	}
 
+	// Remove all paths and points
 	public void clearPath()
 	{
 		lastPoint = null;
@@ -58,6 +61,7 @@ public class PathView extends ImageView
 		waypoints.clear();
 	}
 
+	// Save all paths using bundle's save method
 	public void savePaths(String filename)
 	{
 		if (!bundle.paths.isEmpty())
@@ -66,11 +70,13 @@ public class PathView extends ImageView
 		}
 	}
 
+	// Load paths
 	public void loadPaths(String filename)
 	{
 		bundle = MapBundle.load(context, filename);
 		if (bundle != null)
 		{
+			// Add waypoints to View's list (for drawing & searching)
 			for (MapPath p : bundle.paths)
 			{
 				p.resize(cameraWidth, cameraHeight);
@@ -79,13 +85,15 @@ public class PathView extends ImageView
 					waypoints.add(p.getWaypoint(i));
 				}
 			}
+			// Make sure any leftover searches are cleaned up
 			unvisitNodes();
 		}
 		else
-			Toast.makeText(context, "Could not load path", Toast.LENGTH_SHORT)
+			Toast.makeText(context, "Could not load paths", Toast.LENGTH_SHORT)
 					.show();
 	}
 
+	// Used to avoid TSP when searching
 	private void unvisitNodes()
 	{
 		for (Waypoint wp : waypoints)
@@ -94,6 +102,7 @@ public class PathView extends ImageView
 		}
 	}
 
+	// Returns (Manhattan) distance between two waypoints
 	private float getDistance(Waypoint a, Waypoint b)
 	{
 		float dx = b.x - a.x;
@@ -120,6 +129,8 @@ public class PathView extends ImageView
 		return retPt;
 	}
 
+	// Connects two waypoints, and integrates a onto b's path if not already the
+	// same. a should always be the new waypoint.
 	private void connectPoints(Waypoint a, Waypoint b)
 	{
 		if (a.path != b.path)
@@ -136,6 +147,9 @@ public class PathView extends ImageView
 	public boolean onTouchEvent(MotionEvent e)
 	{
 		Waypoint wp = new Waypoint((int) e.getX(), (int) e.getY());
+
+		// On touch down, either place a new root or prepare to continue an
+		// existing path
 		if (e.getAction() == MotionEvent.ACTION_DOWN)
 		{
 			Waypoint closest = getClosestWaypoint(wp);
@@ -147,9 +161,11 @@ public class PathView extends ImageView
 			{
 				bundle.paths.add(new MapPath(wp, cameraWidth, cameraHeight));
 				lastPoint = wp;
+				waypoints.add(wp);
 			}
-			waypoints.add(wp);
 		}
+		// On move, connect new point to previous point once minimum distance
+		// between points has been reached
 		else if (e.getAction() == MotionEvent.ACTION_MOVE)
 		{
 			if (getDistance(wp, lastPoint) > MIN_DIST)
@@ -162,6 +178,8 @@ public class PathView extends ImageView
 				waypoints.add(wp);
 			}
 		}
+		// On touch up, connect to closest point (under Max distance), not
+		// including last two points
 		else if (e.getAction() == MotionEvent.ACTION_UP)
 		{
 			Waypoint closest = getClosestWaypoint(wp);
@@ -175,6 +193,7 @@ public class PathView extends ImageView
 		return true;
 	}
 
+	// Used for color picking: path number determines color
 	private int maskBytes(int numBytes)
 	{
 		int mask = 0xff000000;
@@ -190,13 +209,17 @@ public class PathView extends ImageView
 		return mask;
 	}
 
+	// Draws lines between points by following the path
 	private void recursiveDrawLine(Canvas canvas, Waypoint wp)
 	{
+		// Don't visit the same node twice
 		wp.visited = true;
 		canvas.drawPoint(wp.x, wp.y, thickPaint);
 		MapPath path = wp.path;
 		for (Edge childEdge : wp.getConnections())
 		{
+			// Drawing the same line twice is pretty harmless, so I'm not TOO
+			// careful here, and it doesn't seem to affect performance
 			Waypoint child = path.getWaypoint(childEdge.edgeToId);
 			canvas.drawLine(wp.x, wp.y, child.x, child.y, thinPaint);
 			if (!child.visited)
@@ -211,6 +234,7 @@ public class PathView extends ImageView
 	{
 		super.onDraw(canvas);
 
+		// Draw each path
 		for (int i = 0; i < bundle.paths.size(); i++)
 		{
 			int color = maskBytes(i % 7 + 1);
@@ -218,11 +242,15 @@ public class PathView extends ImageView
 			thickPaint.setColor(color);
 			recursiveDrawLine(canvas, bundle.paths.get(i).getRoot());
 		}
+		// Reset nodes for next draw cycle
 		unvisitNodes();
 
+		// Not sure what this does, but it was in all the online example code
+		// snippets for drawing on a view
 		invalidate();
 	}
 
+	// When the phone is rotated, resize the paths
 	public void onOrientationChanged(float camWidth, float camHeight)
 	{
 		cameraWidth = camWidth;

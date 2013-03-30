@@ -9,6 +9,8 @@ public class Edge implements Serializable
 
 	public int edgeToId;
 
+	// Basically just an int wrapper. Corresponds to the connected Waypoint's id
+	// in its MapPath.
 	public Edge(int id)
 	{
 		edgeToId = id;

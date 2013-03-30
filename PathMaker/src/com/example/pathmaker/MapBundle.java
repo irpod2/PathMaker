@@ -19,8 +19,10 @@ public class MapBundle implements Serializable
 {
 	private static final long serialVersionUID = -6917082927330285431L;
 
+	// Basically just a container for paths that is also serializable
 	public ArrayList<MapPath> paths = new ArrayList<MapPath>();
 
+	// Resize all paths
 	public void resize(float cameraWidth, float cameraHeight)
 	{
 		for (MapPath p : paths)
@@ -29,6 +31,7 @@ public class MapBundle implements Serializable
 		}
 	}
 
+	// Saves paths to designated file
 	@SuppressLint("WorldReadableFiles")
 	@SuppressWarnings("deprecation")
 	public void save(Context context, String filename)
@@ -52,6 +55,7 @@ public class MapBundle implements Serializable
 
 	}
 
+	// Loads paths from designated file
 	public static MapBundle load(Context context, String filename)
 	{
 		MapBundle bundle = null;
