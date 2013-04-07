@@ -1,84 +1,62 @@
 
 package com.example.pathmaker;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
-import java.io.StreamCorruptedException;
 import java.util.ArrayList;
 
-import android.annotation.SuppressLint;
-import android.app.Activity;
-import android.content.Context;
-
-public class MapBundle implements Serializable
+public class MapBundle
 {
-	private static final long serialVersionUID = -6917082927330285431L;
-
 	// Basically just a container for paths that is also serializable
-	public ArrayList<MapPath> paths = new ArrayList<MapPath>();
+	public ArrayList<MapPath> paths;
 
-	// Resize all paths
-	public void resize(float cameraWidth, float cameraHeight)
+	public MapBundle()
 	{
+		paths = new ArrayList<MapPath>();
+	}
+
+	public MapBundle(ArrayList<MapPath> p)
+	{
+		paths = p;
+	}
+
+	public String serialize()
+	{
+		String me = "$";
 		for (MapPath p : paths)
 		{
-			p.resize(cameraWidth, cameraHeight);
+			me += p.serialize();
 		}
+		me += "$";
+		return me;
 	}
 
-	// Saves paths to designated file
-	@SuppressLint("WorldReadableFiles")
-	@SuppressWarnings("deprecation")
-	public void save(Context context, String filename)
+	public static MapBundle createFromString(String bundleString)
 	{
-		try
+		if (bundleString.length() > 1 && bundleString.charAt(0) == '$')
 		{
-			FileOutputStream fOut = context.openFileOutput(filename,
-					Activity.MODE_WORLD_READABLE);
-			ObjectOutputStream osw = new ObjectOutputStream(fOut);
-			osw.writeObject(this);
-			osw.close();
+			ArrayList<MapPath> paths = new ArrayList<MapPath>();
+			String pathString = bundleString.substring(1);
+			while (pathString.length() > 0 && pathString.charAt(0) == '<')
+			{
+				int closeBracket = pathString.indexOf('>') + 1;
+				MapPath p = MapPath.createFromString(pathString.substring(0,
+						closeBracket));
+				if (p != null)
+					paths.add(p);
+				else
+					break;
+				pathString = pathString.substring(closeBracket);
+			}
+			if (pathString.charAt(0) == '$')
+			{
+				MapBundle bundle = new MapBundle(paths);
+				return bundle;
+			}
 		}
-		catch (FileNotFoundException e)
-		{
-			e.printStackTrace();
-		}
-		catch (IOException e)
-		{
-			e.printStackTrace();
-		}
-
+		return null;
 	}
 
-	// Loads paths from designated file
-	public static MapBundle load(Context context, String filename)
+	public MapPath getPrimaryPath()
 	{
-		MapBundle bundle = null;
-		try
-		{
-			FileInputStream fin = context.openFileInput(filename);
-			ObjectInputStream sin = new ObjectInputStream(fin);
-			bundle = (MapBundle) sin.readObject();
-			sin.close();
-		}
-		catch (StreamCorruptedException e)
-		{
-			e.printStackTrace();
-		}
-		catch (IOException e)
-		{
-			e.printStackTrace();
-		}
-		catch (ClassNotFoundException e)
-		{
-			e.printStackTrace();
-		}
-
-		return bundle;
+		return paths.get(0);
 	}
 }

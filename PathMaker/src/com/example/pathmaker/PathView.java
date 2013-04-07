@@ -7,26 +7,39 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.drawable.Drawable;
+import android.os.SystemClock;
 import android.view.MotionEvent;
 import android.widget.ImageView;
-import android.widget.Toast;
 
 public class PathView extends ImageView
 {
+	private final long DOUBLE_TAP_TIME = 500L;
 	private final float MIN_DIST = 30.0f;
 	private final float MAX_DIST = 50.0f;
 	private final Context context;
 	private Paint thinPaint = new Paint();
 	private Paint thickPaint = new Paint();
 	private ArrayList<Waypoint> waypoints = new ArrayList<Waypoint>();
-	private MapBundle bundle = new MapBundle();
+	private MapBundle bundle;
 	private Waypoint lastPoint;
 	private Waypoint lastParent;
-	private float cameraWidth;
-	private float cameraHeight;
+	private int cameraZeroX;
+	private int cameraZeroY;
+	private int cameraX;
+	private int cameraY;
+	private int cameraWidth;
+	private int cameraHeight;
+	private int imageWidth;
+	private int imageHeight;
 
-	public PathView(Context baseContext, int resourceID, float camWidth,
-			float camHeight)
+	private long lastTapTime = 0;
+	private float lastX;
+	private float lastY;
+	private boolean dragging = false;
+
+	public PathView(Context baseContext, int resourceID, int camWidth,
+			int camHeight)
 	{
 		super(baseContext);
 
@@ -37,7 +50,18 @@ public class PathView extends ImageView
 
 		setPaints();
 
-		setImageResource(resourceID);
+		setScaleType(ScaleType.CENTER);
+		Drawable bg = getResources().getDrawable(resourceID);
+		setImageDrawable(bg);
+		imageWidth = bg.getIntrinsicWidth();
+		imageHeight = bg.getIntrinsicHeight();
+		cameraZeroX = -imageWidth / 2 + cameraWidth / 2;
+		cameraZeroY = -imageHeight / 2 + cameraHeight / 2;
+		cameraX = cameraZeroX;
+		cameraY = cameraZeroY;
+		scrollTo((int) cameraX, (int) cameraY);
+
+		bundle = new MapBundle();
 	}
 
 	// thinPaint is used for lines
@@ -55,6 +79,9 @@ public class PathView extends ImageView
 	// Remove all paths and points
 	public void clearPath()
 	{
+		cameraX = cameraZeroX;
+		cameraY = cameraZeroY;
+		scrollTo(cameraX, cameraY);
 		lastPoint = null;
 		lastParent = null;
 		bundle.paths.clear();
@@ -66,20 +93,22 @@ public class PathView extends ImageView
 	{
 		if (!bundle.paths.isEmpty())
 		{
-			bundle.save(context, filename);
+			MapSaveService.save(context, bundle, filename);
 		}
 	}
 
 	// Load paths
 	public void loadPaths(String filename)
 	{
-		bundle = MapBundle.load(context, filename);
-		if (bundle != null)
+		MapBundle newPaths = null;
+		newPaths = MapSaveService.load(context, filename);
+		if (newPaths != null)
 		{
+			bundle = newPaths;
 			// Add waypoints to View's list (for drawing & searching)
 			for (MapPath p : bundle.paths)
 			{
-				p.resize(cameraWidth, cameraHeight);
+				// p.resize(cameraWidth, cameraHeight);
 				for (int i = 0; i < p.size(); i++)
 				{
 					waypoints.add(p.getWaypoint(i));
@@ -88,9 +117,6 @@ public class PathView extends ImageView
 			// Make sure any leftover searches are cleaned up
 			unvisitNodes();
 		}
-		else
-			Toast.makeText(context, "Could not load paths", Toast.LENGTH_SHORT)
-					.show();
 	}
 
 	// Used to avoid TSP when searching
@@ -105,6 +131,9 @@ public class PathView extends ImageView
 	// Returns (Manhattan) distance between two waypoints
 	private float getDistance(Waypoint a, Waypoint b)
 	{
+		cameraZeroX = -imageWidth / 2 + cameraWidth / 2;
+		if (a == null || b == null)
+			return Float.MAX_VALUE;
 		float dx = b.x - a.x;
 		float dy = b.y - a.y;
 		return (float) Math.sqrt(dx * dx + dy * dy);
@@ -146,7 +175,8 @@ public class PathView extends ImageView
 	@Override
 	public boolean onTouchEvent(MotionEvent e)
 	{
-		Waypoint wp = new Waypoint((int) e.getX(), (int) e.getY());
+		Waypoint wp = new Waypoint((int) (e.getX() + cameraX - cameraZeroX),
+				(int) (e.getY() + cameraY - cameraZeroY));
 
 		// On touch down, either place a new root or prepare to continue an
 		// existing path
@@ -159,16 +189,48 @@ public class PathView extends ImageView
 			}
 			else
 			{
-				bundle.paths.add(new MapPath(wp, cameraWidth, cameraHeight));
-				lastPoint = wp;
-				waypoints.add(wp);
+				long time = SystemClock.elapsedRealtime();
+				long dt = time - lastTapTime;
+				if (dt < DOUBLE_TAP_TIME)
+				{
+					bundle.paths.add(new MapPath(wp));
+					lastPoint = wp;
+					waypoints.add(wp);
+				}
+				else
+				{
+					dragging = true;
+					lastX = e.getX();
+					lastY = e.getY();
+				}
+				lastTapTime = time;
 			}
 		}
 		// On move, connect new point to previous point once minimum distance
 		// between points has been reached
 		else if (e.getAction() == MotionEvent.ACTION_MOVE)
 		{
-			if (getDistance(wp, lastPoint) > MIN_DIST)
+			if (dragging)
+			{
+				float dx = lastX - e.getX();
+				float dy = lastY - e.getY();
+				// Keep camera in bounds: between 0 and image bounds
+				// (X & Y move independently)
+				cameraX = Math.max(
+						-imageWidth / 2 + cameraWidth / 2,
+						Math.min((int) (cameraX + dx), imageWidth / 2
+								- cameraWidth / 2));
+				cameraY = Math.max(
+						-imageHeight / 2 + cameraHeight / 2,
+						Math.min((int) (cameraY + dy), imageHeight / 2
+								- cameraHeight / 2));
+				scrollTo((int) cameraX, (int) cameraY);
+
+				// Set new X,Y position
+				lastX = e.getX();
+				lastY = e.getY();
+			}
+			else if (getDistance(wp, lastPoint) > MIN_DIST)
 			{
 				lastPoint.path.addWaypoint(wp);
 				connectPoints(wp, lastPoint);
@@ -177,18 +239,23 @@ public class PathView extends ImageView
 				lastPoint = wp;
 				waypoints.add(wp);
 			}
+
 		}
 		// On touch up, connect to closest point (under Max distance), not
 		// including last two points
 		else if (e.getAction() == MotionEvent.ACTION_UP)
 		{
-			Waypoint closest = getClosestWaypoint(wp);
-			if (closest != null)
+			if (!dragging)
 			{
-				connectPoints(lastPoint, closest);
+				Waypoint closest = getClosestWaypoint(wp);
+				if (closest != null)
+				{
+					connectPoints(lastPoint, closest);
+				}
+				lastPoint = null;
+				lastParent = null;
 			}
-			lastPoint = null;
-			lastParent = null;
+			dragging = false;
 		}
 		return true;
 	}
@@ -214,14 +281,15 @@ public class PathView extends ImageView
 	{
 		// Don't visit the same node twice
 		wp.visited = true;
-		canvas.drawPoint(wp.x, wp.y, thickPaint);
+		canvas.drawPoint(wp.x + cameraZeroX, wp.y + cameraZeroY, thickPaint);
 		MapPath path = wp.path;
 		for (Edge childEdge : wp.getConnections())
 		{
 			// Drawing the same line twice is pretty harmless, so I'm not TOO
 			// careful here, and it doesn't seem to affect performance
 			Waypoint child = path.getWaypoint(childEdge.edgeToId);
-			canvas.drawLine(wp.x, wp.y, child.x, child.y, thinPaint);
+			canvas.drawLine(wp.x + cameraZeroX, wp.y + cameraZeroY, child.x
+					+ cameraZeroX, child.y + cameraZeroY, thinPaint);
 			if (!child.visited)
 			{
 				recursiveDrawLine(canvas, child);
@@ -251,10 +319,15 @@ public class PathView extends ImageView
 	}
 
 	// When the phone is rotated, resize the paths
-	public void onOrientationChanged(float camWidth, float camHeight)
+	public void onOrientationChanged(int camWidth, int camHeight)
 	{
 		cameraWidth = camWidth;
 		cameraHeight = camHeight;
-		bundle.resize(camWidth, camHeight);
+		cameraZeroX = -imageWidth / 2 + cameraWidth / 2;
+		cameraZeroY = -imageHeight / 2 + cameraHeight / 2;
+		cameraX = cameraZeroX;
+		cameraY = cameraZeroY;
+		scrollTo(cameraX, cameraY);
+		// bundle.resize(camWidth, camHeight);
 	}
 }

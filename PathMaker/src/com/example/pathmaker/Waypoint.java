@@ -1,14 +1,11 @@
 
 package com.example.pathmaker;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 
-public class Waypoint implements Serializable
+public class Waypoint
 {
-	private static final long serialVersionUID = -6025388855674604869L;
-
-	private ArrayList<Edge> edges = new ArrayList<Edge>();
+	private ArrayList<Edge> edges;
 	public boolean visited = false;
 	public int id;
 	public int x;
@@ -23,13 +20,67 @@ public class Waypoint implements Serializable
 		x = pX;
 		y = pY;
 		path = null;
+		edges = new ArrayList<Edge>();
 	}
 
-	public Waypoint(int pX, int pY, MapPath mapPath)
+	public Waypoint(int pX, int pY, int ID, ArrayList<Edge> edgeList)
 	{
 		x = pX;
 		y = pY;
-		path = mapPath;
+		id = ID;
+		edges = edgeList;
+	}
+
+	public String serialize()
+	{
+		String me = "{" + String.valueOf(id) + "(" + String.valueOf(x) + ","
+				+ String.valueOf(y) + ")";
+		for (Edge e : edges)
+		{
+			me += "[" + String.valueOf(e.edgeToId) + "]";
+		}
+		me += "}";
+		return me;
+	}
+
+	public static Waypoint createFromString(String wpString)
+	{
+		try
+		{
+			if (wpString.charAt(0) == '{')
+			{
+				int openParen = wpString.indexOf('(');
+				int id = Integer.parseInt(wpString.substring(1, openParen));
+				int comma = wpString.indexOf(',');
+				int x = Integer.parseInt(wpString.substring(openParen + 1,
+						comma));
+				int closeParen = wpString.indexOf(')');
+				int y = Integer.parseInt(wpString.substring(comma + 1,
+						closeParen));
+				String edgeString = wpString.substring(closeParen + 1);
+				ArrayList<Edge> edges = new ArrayList<Edge>();
+				while (edgeString.length() != 0)
+				{
+					if (edgeString.charAt(0) == '[')
+					{
+						int closeBracket = edgeString.indexOf(']');
+						int edgeToId = Integer.parseInt(edgeString.substring(1,
+								closeBracket));
+						edges.add(new Edge(edgeToId));
+						edgeString = edgeString.substring(closeBracket + 1);
+					}
+					else if (edgeString.charAt(0) == '}')
+						edgeString = "";
+				}
+				Waypoint wp = new Waypoint(x, y, id, edges);
+				return wp;
+			}
+		}
+		catch (Exception e)
+		{
+			e.printStackTrace();
+		}
+		return null;
 	}
 
 	// When a path gets integrated into another, the edge ids all change, but

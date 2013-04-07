@@ -1,17 +1,11 @@
 
 package com.example.pathmaker;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 
-public class MapPath implements Serializable
+public class MapPath
 {
-	private static final long serialVersionUID = -983318575744762813L;
-
 	private ArrayList<Waypoint> waypoints;
-
-	private float cameraWidth;
-	private float cameraHeight;
 
 	/*
 	 * A path consists of a list of Waypoints. The first element is considered
@@ -24,30 +18,77 @@ public class MapPath implements Serializable
 	 * destination is reached.
 	 */
 
-	public MapPath(Waypoint root, float camWidth, float camHeight)
+	public MapPath(Waypoint root)
 	{
-		cameraWidth = camWidth;
-		cameraHeight = camHeight;
 		root.path = this;
 		root.id = 0;
 		waypoints = new ArrayList<Waypoint>();
 		waypoints.add(root);
 	}
 
-	// Resizes points to appear proportional(ish) on any window aspect ratio
-	public void resize(float camWidth, float camHeight)
+	public MapPath(ArrayList<Waypoint> points)
 	{
-		float dw = camWidth / cameraWidth;
-		float dh = camHeight / cameraHeight;
+		waypoints = points;
+		for (Waypoint wp : waypoints)
+			wp.path = this;
+	}
+
+	public String serialize()
+	{
+		String me = "<";
 		for (Waypoint wp : waypoints)
 		{
-			wp.x *= dw;
-			wp.y *= dh;
+			me += wp.serialize();
 		}
-
-		cameraWidth = camWidth;
-		cameraHeight = camHeight;
+		me += ">";
+		return me;
 	}
+
+	public static MapPath createFromString(String pathString)
+	{
+		try
+		{
+			if (pathString.charAt(0) == '<')
+			{
+				ArrayList<Waypoint> waypoints = new ArrayList<Waypoint>();
+				String wpString = pathString.substring(1);
+				while (wpString.charAt(0) != '>')
+				{
+					if (wpString.charAt(0) == '{')
+					{
+						int closeBrace = wpString.indexOf('}') + 1;
+						Waypoint wp = Waypoint.createFromString(wpString
+								.substring(0, closeBrace));
+						// If no problem with string, add waypoint
+						if (wp != null)
+							waypoints.add(wp);
+						// Otherwise, entire map is compromised
+						else
+							return null;
+						wpString = wpString.substring(closeBrace);
+					}
+					else
+						return null;
+				}
+				MapPath path = new MapPath(waypoints);
+				return path;
+			}
+		}
+		catch (Exception e)
+		{
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	// Resizes points to appear proportional(ish) on any window aspect ratio
+	/*
+	 * public void resize(float camWidth, float camHeight) { float dw = camWidth
+	 * / cameraWidth; float dh = camHeight / cameraHeight; for (Waypoint wp :
+	 * waypoints) { wp.x *= dw; wp.y *= dh; }
+	 * 
+	 * cameraWidth = camWidth; cameraHeight = camHeight; }
+	 */
 
 	public int size()
 	{

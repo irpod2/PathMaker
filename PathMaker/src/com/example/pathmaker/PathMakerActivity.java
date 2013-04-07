@@ -39,10 +39,12 @@ public class PathMakerActivity extends Activity
 
 		// Change background image from ic_launcher to desired image in
 		// drawables folder
-		pathView = new PathView(this, R.drawable.ic_launcher, cameraWidth,
+		pathView = new PathView(this, R.drawable.worldmap, cameraWidth,
 				cameraHeight);
-		
+
 		setContentView(pathView);
+
+		MapSaveService.init(getBaseContext());
 	}
 
 	@SuppressWarnings("deprecation")
@@ -59,8 +61,7 @@ public class PathMakerActivity extends Activity
 			cameraWidth = size.x;
 			cameraHeight = size.y;
 		}
-		// For APIs < 13, getSize(Point) doesn't exist. Nice forethought,
-		// Android.
+		// For APIs < 13, getSize(Point) doesn't exist.
 		else
 		{
 			cameraWidth = display.getWidth();
